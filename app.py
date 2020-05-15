@@ -1,13 +1,17 @@
-from flask import Flask, jsonify, request, json
+from flask import Flask, jsonify, request, json, url_for
 from flask_mysqldb import MySQL
 from datetime import datetime
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired
+from flask_mail import Mail, Message
 import random
 import string
 
 app = Flask(__name__)
+app.config.from_pyfile('config.cfg')
+mail = Mail(app)
 
 with open('./connections.json') as f:
     data = json.load(f)
@@ -19,8 +23,9 @@ app.config['MYSQL_PASSWORD'] = data['password']
 app.config['MYSQL_HOST'] = data['host']
 app.config['MYSQL_DB'] = 'YouChoose'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
-app.config['JWT_SECRET_KEY'] = 'secret'
+app.config['JWT_SECRET_KEY'] = data['secret']
 
+s = URLSafeTimedSerializer(app.config['JWT_SECRET_KEY'])
 
 mysql = MySQL(app)
 bcrypt = Bcrypt(app)
@@ -62,7 +67,7 @@ def signup():
         request.get_json()['password']).decode('utf-8')  # check client side
     created = datetime.utcnow()
     user_id = id_generator()
-    email_validation = False
+    email_validation = 0
 
     check = check_existing(email)
 
@@ -82,9 +87,39 @@ def signup():
 
         mysql.connection.commit()
 
+        email_token = s.dumps([email], salt='email-confirm')
+        #user_id_dump = s.dumps(user_id, salt='user-id')
+        link = url_for('confirm_email',
+                       email_token=email_token, _external=True)
+
+        print(email_token)
+
+        email_message = Message(
+            'Confirm Email', sender='youchoose@noreply.com', recipients=[email])
+        email_message.body = 'Your confirmation link is {}'.format(link)
+        mail.send(email_message)
+
         return('Success')
 
     # print( '\\)
+
+
+@app.route('/confirm_email/<email_token>')
+def confirm_email(email_token):
+    try:
+        email = s.loads(email_token, salt='email-confirm', max_age=3600)
+        #user_id_load = s.loads(user_id_dump, salt='user-id')
+        print(email)
+        cur = mysql.connection.cursor()
+
+        # update the email confirmed column in db
+        cur.execute(
+            "UPDATE Users SET email_validation = True WHERE email = '" + email[0] + "'")
+        mysql.connection.commit()
+    except SignatureExpired:
+        return 'The token is expired'
+
+    return 'Email Confirmed!'
 
 
 @app.route('/')
