@@ -68,6 +68,7 @@ def signup():
     created = datetime.utcnow()
     user_id = id_generator()
     email_validation = 0
+    session = 1
 
     check = check_existing(email)
 
@@ -77,13 +78,14 @@ def signup():
 
     else:
 
-        cur.execute("INSERT INTO Users (full_name, email, password, user_id, created, email_validation) VALUES ('" +
+        cur.execute("INSERT INTO Users (full_name, email, password, user_id, created, email_validation, session) VALUES ('" +
                     full_name + "', '" +
                     email + "', '" +
                     password + "', '" +
                     user_id + "', '" +
                     str(created) + "', '" +
-                    str(email_validation) + "')")
+                    str(email_validation) + "', '" +
+                    str(session) + "')")
 
         mysql.connection.commit()
 
@@ -137,13 +139,31 @@ def login():
 
         access_token = create_access_token(
             identity={'full_name': data['full_name'], 'email': data['email']})
-        result = jsonify({'access_token': access_token})
+        result = jsonify(
+            {'access_token': access_token, 'email': data['email']})
+
+        cur.execute(
+            "UPDATE Users SET session = True WHERE email = '" + email + "'")
+        mysql.connection.commit()
 
     else:
 
         result = jsonify({'error': 'Invalid username or password'})
 
     return result
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+
+    email = request.get_json()['email']
+    cur = mysql.connection.cursor()
+
+    cur.execute(
+        "UPDATE Users SET session = False WHERE email = '" + email + "'")
+    mysql.connection.commit()
+
+    return jsonify({'success': True})
 
 
 @app.route('/')
