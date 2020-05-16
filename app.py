@@ -73,7 +73,7 @@ def signup():
 
     if(check == True):
 
-        return('An account with this email already exists')
+        return jsonify({'error': 'An account with this email already exists'})
 
     else:
 
@@ -99,7 +99,7 @@ def signup():
         email_message.body = 'Your confirmation link is {}'.format(link)
         mail.send(email_message)
 
-        return('Success')
+        return jsonify({'success': True})
 
     # print( '\\)
 
@@ -108,7 +108,6 @@ def signup():
 def confirm_email(email_token):
     try:
         email = s.loads(email_token, salt='email-confirm', max_age=3600)
-        #user_id_load = s.loads(user_id_dump, salt='user-id')
         print(email)
         cur = mysql.connection.cursor()
 
@@ -120,6 +119,31 @@ def confirm_email(email_token):
         return 'The token is expired'
 
     return 'Email Confirmed!'
+
+
+@app.route('/login', methods=['POST'])
+def login():
+
+    cur = mysql.connection.cursor()
+    email = request.get_json()['email']
+    password = request.get_json()['password']
+
+    result = ''
+
+    cur.execute("SELECT * FROM Users WHERE email = '" + email + "'")
+    data = cur.fetchone()
+
+    if bcrypt.check_password_hash(data['password'], password):
+
+        access_token = create_access_token(
+            identity={'full_name': data['full_name'], 'email': data['email']})
+        result = jsonify({'access_token': access_token})
+
+    else:
+
+        result = jsonify({'error': 'Invalid username or password'})
+
+    return result
 
 
 @app.route('/')
