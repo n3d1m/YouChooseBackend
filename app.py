@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, json, url_for
+from flask import Flask, jsonify, request, json, url_for, make_response
 from flask_mysqldb import MySQL
 from datetime import datetime
 from flask_cors import CORS
@@ -72,9 +72,11 @@ def signup():
 
     check = check_existing(email)
 
+    print(check)
+
     if(check == True):
 
-        return jsonify({'error': 'An account with this email already exists'})
+        return jsonify(response='An account with this email already exists')
 
     else:
 
@@ -101,7 +103,7 @@ def signup():
         email_message.body = 'Your confirmation link is {}'.format(link)
         mail.send(email_message)
 
-        return jsonify({'success': True})
+        return jsonify(response='Success')
 
     # print( '\\)
 
