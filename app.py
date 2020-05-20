@@ -132,25 +132,34 @@ def login():
     email = request.get_json()['email']
     password = request.get_json()['password']
 
+    print(email, password)
+
     result = ''
 
-    cur.execute("SELECT * FROM Users WHERE email = '" + email + "'")
+    cur.execute("SELECT * FROM Users where email = '" + email + "'")
+    mysql.connection.commit()
     data = cur.fetchone()
 
-    if bcrypt.check_password_hash(data['password'], password):
+    if(data == None):
 
-        access_token = create_access_token(
-            identity={'full_name': data['full_name'], 'email': data['email']})
-        result = jsonify(
-            {'access_token': access_token, 'email': data['email']})
-
-        cur.execute(
-            "UPDATE Users SET session = True WHERE email = '" + email + "'")
-        mysql.connection.commit()
+        return jsonify(response='There is no account linked to this email', ok=False)
 
     else:
 
-        result = jsonify({'error': 'Invalid username or password'})
+        if bcrypt.check_password_hash(data['password'], password):
+
+            access_token = create_access_token(
+                identity={'full_name': data['full_name'], 'email': data['email']})
+            result = jsonify(
+                access_token=access_token, email=data['email'], ok=True)
+
+            cur.execute(
+                "UPDATE Users SET session = True WHERE email = '" + email + "'")
+            mysql.connection.commit()
+
+        else:
+
+            result = jsonify(response='Invalid username or password', ok=False)
 
     return result
 
