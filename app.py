@@ -151,7 +151,7 @@ def login():
             access_token = create_access_token(
                 identity={'full_name': data['full_name'], 'email': data['email']})
             result = jsonify(
-                access_token=access_token, email=data['email'], ok=True)
+                access_token=access_token, email=data['email'], full_name=data['full_name'], ok=True)
 
             cur.execute(
                 "UPDATE Users SET session = True WHERE email = '" + email + "'")
@@ -175,6 +175,14 @@ def logout():
     mysql.connection.commit()
 
     return jsonify({'success': True})
+
+
+# @app.route('/random-selection')
+# def places():
+
+#     location_data = request.get_json()['location']
+
+#     endpoint = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
 
 
 @app.route('/')
