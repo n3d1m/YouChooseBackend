@@ -3,11 +3,13 @@ from flask_mysqldb import MySQL
 from datetime import datetime
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
-from flask_jwt_extended import JWTManager, create_access_token
+from flask_jwt_extended import JWTManager, create_access_token, decode_token
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 from flask_mail import Mail, Message
 import random
 import string
+import requests
+import time
 
 app = Flask(__name__)
 app.config.from_pyfile('config.cfg')
@@ -92,7 +94,7 @@ def signup():
         mysql.connection.commit()
 
         email_token = s.dumps([email], salt='email-confirm')
-        #user_id_dump = s.dumps(user_id, salt='user-id')
+        # user_id_dump = s.dumps(user_id, salt='user-id')
         link = url_for('confirm_email',
                        email_token=email_token, _external=True)
 
@@ -140,6 +142,8 @@ def login():
     mysql.connection.commit()
     data = cur.fetchone()
 
+    print(data)
+
     if(data == None):
 
         return jsonify(response='There is no account linked to this email', ok=False)
@@ -149,9 +153,9 @@ def login():
         if bcrypt.check_password_hash(data['password'], password):
 
             access_token = create_access_token(
-                identity={'full_name': data['full_name'], 'email': data['email']})
+                identity={'user_id': data['user_id']})
             result = jsonify(
-                access_token=access_token, email=data['email'], full_name=data['full_name'], ok=True)
+                access_token=access_token, email=data['email'], full_name=data['full_name'], user_id=data['user_id'], ok=True)
 
             cur.execute(
                 "UPDATE Users SET session = True WHERE email = '" + email + "'")
@@ -177,12 +181,64 @@ def logout():
     return jsonify({'success': True})
 
 
-# @app.route('/random-selection')
-# def places():
+@app.route('/random_selection', methods=['POST'])
+def places():
 
-#     location_data = request.get_json()['location']
+    auth_header = request.headers.get('Authorization').split(' ')
 
-#     endpoint = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+    # print(auth_header)
+
+    if(len(auth_header) < 2):
+
+        return(jsonify(ok=False, response='Invalid access token'))
+
+    else:
+
+        print('here')
+
+        decode = decode_token(auth_header[1])
+
+        #print(not isinstance(decode, str))
+
+        print(decode)
+
+        if not isinstance(decode, str):
+
+            lat = request.get_json()['lat']
+            lng = request.get_json()['long']
+
+            endpoint = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+            params = {
+                'location': str(lat) + ',' + str(lng),
+                'radius': '5000',
+                'type': 'restaurant',
+                'key': data['google_key']
+            }
+
+            places = []
+
+            res = requests.get(endpoint, params=params)
+            results = json.loads(res.content)
+            places.extend(results['results'])
+            time.sleep(2)
+
+            while "next_page_token" in results:
+                params['pagetoken'] = results['next_page_token'],
+                res = requests.get(endpoint, params=params)
+                results = json.loads(res.content)
+                places.extend(results['results'])
+                time.sleep(2)
+
+            places_length = len(places)
+            random_index = random.randint(0, places_length-1)
+
+            return(
+                jsonify(data=places[random_index])
+            )
+
+        else:
+
+            return(jsonify(ok=False, response='Invalid access token'))
 
 
 @app.route('/')
