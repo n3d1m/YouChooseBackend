@@ -232,8 +232,23 @@ def places():
             places_length = len(places)
             random_index = random.randint(0, places_length-1)
 
+            return_data = places[random_index]
+
+            try:
+                image = ('https://maps.googleapis.com/maps/api/place/photo'
+                         '?maxwidth=%s'
+                         '&?maxheight=%s'
+                         '&photoreference=%s'
+                         '&key=%s') % (return_data['photos'][0]['width'], return_data['photos'][0]['height'],
+                                       return_data['photos'][0]['photo_reference'], data['google_key'])
+
+            except:
+                image = None
+
+            return_data['image_url'] = image
+
             return(
-                jsonify(data=places[random_index])
+                jsonify(data=return_data, ok=True)
             )
 
         else:
