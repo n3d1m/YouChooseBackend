@@ -6,6 +6,9 @@ from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, create_access_token, decode_token
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 from flask_mail import Mail, Message
+from io import BytesIO, TextIOWrapper
+from google_images_download import google_images_download
+import sys
 import random
 import string
 import requests
@@ -198,7 +201,7 @@ def places():
 
         decode = decode_token(auth_header[1])
 
-        #print(not isinstance(decode, str))
+        # print(not isinstance(decode, str))
 
         print(decode)
 
@@ -211,7 +214,7 @@ def places():
             params = {
                 'location': str(lat) + ',' + str(lng),
                 'radius': '5000',
-                'type': 'restaurant',
+                'type': 'restaurant|meal_delivery|meal_takeaway',
                 'key': data['google_key']
             }
 
@@ -247,6 +250,9 @@ def places():
 
             return_data['image_url'] = image
 
+            return_data = filter_place_details(
+                return_data['place_id'], return_data)
+
             return(
                 jsonify(data=return_data, ok=True)
             )
@@ -254,6 +260,46 @@ def places():
         else:
 
             return(jsonify(ok=False, response='Invalid access token'))
+
+
+def filter_place_details(id, obj):
+
+    place_detail_url = "https://maps.googleapis.com/maps/api/place/details/json?parameters"
+    detail_params = {
+        'key': data['google_key'],
+        'place_id': id
+    }
+
+    detail_res = requests.get(place_detail_url, params=detail_params)
+    place_details = json.loads(detail_res.content)
+
+    print(place_details['result'].keys())
+    print(place_details['result']['formatted_address'])
+
+    # get_place_logo(place_details['result']['name'],
+    # place_details['result']['formatted_address'].split(',')[1])
+
+    obj['address'] = place_details['result']['formatted_address'].split(',')[0]
+    obj['phone_number'] = place_details['result']['formatted_phone_number']
+
+    return obj
+
+
+def get_place_logo(name, city):
+
+    print(name, city)
+
+    response = google_images_download.googleimagesdownload()
+
+    arguments = {
+        "keywords": name + '' + city + ' icon',
+        "limit": 1,
+        "print_urls": True
+    }
+
+    paths = response.download(arguments)
+
+    print(paths)
 
 
 @app.route('/')
