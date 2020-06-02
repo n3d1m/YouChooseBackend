@@ -156,7 +156,7 @@ def login():
         if bcrypt.check_password_hash(data['password'], password):
 
             access_token = create_access_token(
-                identity={'user_id': data['user_id']})
+                identity={'user_id': data['user_id']}, expires_delta=False)
             result = jsonify(
                 access_token=access_token, email=data['email'], full_name=data['full_name'], user_id=data['user_id'], ok=True)
 
@@ -274,13 +274,39 @@ def filter_place_details(id, obj):
     place_details = json.loads(detail_res.content)
 
     print(place_details['result'].keys())
-    print(place_details['result']['formatted_address'])
+    # print(place_details['result']['website'])
 
     # get_place_logo(place_details['result']['name'],
     # place_details['result']['formatted_address'].split(',')[1])
 
     obj['address'] = place_details['result']['formatted_address'].split(',')[0]
     obj['phone_number'] = place_details['result']['formatted_phone_number']
+
+    blacklist = ['facebook.com']
+
+    try:
+        website = place_details['result']['website'].split(
+            '://')[1].split('/')[0].split('www.')
+
+        if website in blacklist:
+
+            website = None
+
+        elif len(website) > 1:
+
+            website = website[1]
+
+        else:
+
+            website = website[0]
+
+        print(website)
+
+        obj['logo_url'] = website
+
+    except:
+
+        obj['logo_url'] = None
 
     return obj
 
