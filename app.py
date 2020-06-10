@@ -274,6 +274,7 @@ def filter_place_details(id, obj):
     place_details = json.loads(detail_res.content)
 
     print(place_details['result'].keys())
+    print(place_details['result']['opening_hours']['weekday_text'])
     # print(place_details['result']['website'])
 
     # get_place_logo(place_details['result']['name'],
@@ -281,6 +282,7 @@ def filter_place_details(id, obj):
 
     obj['address'] = place_details['result']['formatted_address'].split(',')[0]
     obj['phone_number'] = place_details['result']['formatted_phone_number']
+    obj['opening_hours']['hours'] = place_details['result']['opening_hours']['weekday_text']
 
     blacklist = ['facebook.com']
 
