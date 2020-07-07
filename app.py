@@ -253,6 +253,8 @@ def places():
             return_data = filter_place_details(
                 return_data['place_id'], return_data)
 
+            print(return_data)
+
             return(
                 jsonify(data=return_data, ok=True)
             )
@@ -273,8 +275,8 @@ def filter_place_details(id, obj):
     detail_res = requests.get(place_detail_url, params=detail_params)
     place_details = json.loads(detail_res.content)
 
-    print(place_details['result'].keys())
-    print(place_details['result']['opening_hours']['weekday_text'])
+    # print(place_details['result'])
+    # print(place_details['result']['opening_hours']['weekday_text'])
     # print(place_details['result']['website'])
 
     # get_place_logo(place_details['result']['name'],
@@ -305,10 +307,12 @@ def filter_place_details(id, obj):
         print(website)
 
         obj['logo_url'] = website
+        obj['full_website'] = place_details['result']['website']
 
     except:
 
         obj['logo_url'] = None
+        obj['full_website'] = None
 
     return obj
 
