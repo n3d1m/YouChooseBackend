@@ -21,7 +21,7 @@ mail = Mail(app)
 with open('./connections.json') as f:
     data = json.load(f)
 
-print(data)
+# print(data)
 
 app.config['MYSQL_USER'] = data['user']
 app.config['MYSQL_PASSWORD'] = data['password']
@@ -52,7 +52,7 @@ def check_existing(email):
     cur.execute("SELECT * FROM YouChoose.Users where email= '" + email + "'")
     result = cur.fetchall()
 
-    print(len(result))
+    # print(len(result))
 
     if(len(result) >= 1):
 
@@ -77,7 +77,7 @@ def signup():
 
     check = check_existing(email)
 
-    print(check)
+    # print(check)
 
     if(check == True):
 
@@ -101,7 +101,7 @@ def signup():
         link = url_for('confirm_email',
                        email_token=email_token, _external=True)
 
-        print(email_token)
+        # print(email_token)
 
         email_message = Message(
             'Confirm Email', sender='youchoose@noreply.com', recipients=[email])
@@ -117,7 +117,7 @@ def signup():
 def confirm_email(email_token):
     try:
         email = s.loads(email_token, salt='email-confirm', max_age=3600)
-        print(email)
+        # print(email)
         cur = mysql.connection.cursor()
 
         # update the email confirmed column in db
@@ -137,7 +137,7 @@ def login():
     email = request.get_json()['email']
     password = request.get_json()['password']
 
-    print(email, password)
+    # print(email, password)
 
     result = ''
 
@@ -145,7 +145,7 @@ def login():
     mysql.connection.commit()
     data = cur.fetchone()
 
-    print(data)
+    # print(data)
 
     if(data == None):
 
@@ -203,7 +203,7 @@ def places():
 
         # print(not isinstance(decode, str))
 
-        print(decode)
+        # print(decode)
 
         if not isinstance(decode, str):
 
@@ -253,7 +253,7 @@ def places():
             return_data = filter_place_details(
                 return_data['place_id'], return_data)
 
-            print(return_data)
+            # print(return_data)
 
             return(
                 jsonify(data=return_data, ok=True)
@@ -275,7 +275,7 @@ def filter_place_details(id, obj):
     detail_res = requests.get(place_detail_url, params=detail_params)
     place_details = json.loads(detail_res.content)
 
-    # print(place_details['result'])
+    print(place_details['result']['photos'])
     # print(place_details['result']['opening_hours']['weekday_text'])
     # print(place_details['result']['website'])
 
@@ -285,6 +285,7 @@ def filter_place_details(id, obj):
     obj['address'] = place_details['result']['formatted_address'].split(',')[0]
     obj['phone_number'] = place_details['result']['formatted_phone_number']
     obj['opening_hours']['hours'] = place_details['result']['opening_hours']['weekday_text']
+    obj['photo_array'] = get_photos(place_details['result']['photos'])
 
     blacklist = ['facebook.com']
 
@@ -304,7 +305,7 @@ def filter_place_details(id, obj):
 
             website = website[0]
 
-        print(website)
+        # print(website)
 
         obj['logo_url'] = website
         obj['full_website'] = place_details['result']['website']
@@ -315,6 +316,28 @@ def filter_place_details(id, obj):
         obj['full_website'] = None
 
     return obj
+
+
+def get_photos(arr):
+
+    photo_bucket = []
+
+    for i in arr:
+
+        try:
+            image = ('https://maps.googleapis.com/maps/api/place/photo'
+                     '?maxwidth=%s'
+                     '&?maxheight=%s'
+                     '&photoreference=%s'
+                     '&key=%s') % (i['width'], i['height'],
+                                   i['photo_reference'], data['google_key'])
+        except:
+
+            image = None
+
+        photo_bucket.append(image)
+
+    return photo_bucket
 
 
 def get_place_logo(name, city):
