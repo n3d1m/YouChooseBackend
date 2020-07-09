@@ -275,17 +275,25 @@ def filter_place_details(id, obj):
     detail_res = requests.get(place_detail_url, params=detail_params)
     place_details = json.loads(detail_res.content)
 
-    print(place_details['result']['photos'])
+    print(place_details['result']['reviews'])
     # print(place_details['result']['opening_hours']['weekday_text'])
     # print(place_details['result']['website'])
 
     # get_place_logo(place_details['result']['name'],
     # place_details['result']['formatted_address'].split(',')[1])
 
+    try:
+
+        obj['opening_hours']['hours'] = place_details['result']['opening_hours']['weekday_text']
+
+    except:
+
+        obj['opening_hours']['hours'] = None
+
     obj['address'] = place_details['result']['formatted_address'].split(',')[0]
     obj['phone_number'] = place_details['result']['formatted_phone_number']
-    obj['opening_hours']['hours'] = place_details['result']['opening_hours']['weekday_text']
     obj['photo_array'] = get_photos(place_details['result']['photos'])
+    obj['reviews'] = place_details['result']['reviews']
 
     blacklist = ['facebook.com']
 
