@@ -7,7 +7,7 @@ from flask_jwt_extended import JWTManager, create_access_token, decode_token
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 from flask_mail import Mail, Message
 from io import BytesIO, TextIOWrapper
-from google_images_download import google_images_download
+import numpy as np
 import sys
 import random
 import string
@@ -210,7 +210,7 @@ def places():
             lat = request.get_json()['lat']
             lng = request.get_json()['long']
 
-            endpoint = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+            endpoint = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?parameters"
             params = {
                 'location': str(lat) + ',' + str(lng),
                 'radius': '5000',
@@ -348,21 +348,151 @@ def get_photos(arr):
     return photo_bucket
 
 
-def get_place_logo(name, city):
+@app.route('/filtered_selection', methods=['POST'])
+def places_filtered():
 
-    print(name, city)
+    auth_header = request.headers.get('Authorization').split(' ')
 
-    response = google_images_download.googleimagesdownload()
+    # print(auth_header)
 
-    arguments = {
-        "keywords": name + '' + city + ' icon',
-        "limit": 1,
-        "print_urls": True
+    if(len(auth_header) < 2):
+
+        return(jsonify(ok=False, response='Invalid access token'))
+
+    else:
+
+        decode = decode_token(auth_header[1])
+
+        if not isinstance(decode, str):
+
+            lat = request.get_json()['lat']
+            lng = request.get_json()['long']
+            category = request.get_json()['category']
+            price_range = request.get_json()['price_range']
+            distance = request.get_json()['distance']
+            rating = request.get_json()['rating'],
+            city = request.get_json()['city']
+
+            print(request.get_json())
+
+            distance_val = 10000 if distance == None else distance*1000
+
+            endpoint = "https://maps.googleapis.com/maps/api/place/details/json?parameters" if category == None else 'https://maps.googleapis.com/maps/api/place/textsearch/json?parameters'
+            params = {
+                'key': data['google_key'],
+                'query': str(category) + ' food in ' + str(city),
+                'location': str(lat) + ',' + str(lng),
+                'radius': str(distance_val),
+                'minprice': price_range_convert(price_range)['minprice'],
+                'maxprice': price_range_convert(price_range)['maxprice'],
+                'type': 'restaurant|meal_delivery|meal_takeaway',
+            }
+
+            # {
+            #     'location': str(lat) + ',' + str(lng),
+            #     'radius': '5000',
+            #     'type': 'restaurant|meal_delivery|meal_takeaway',
+            #     'key': data['google_key']
+            # }
+
+            places = []
+
+            print(endpoint)
+
+            res = requests.get(endpoint, params=params)
+            results = json.loads(res.content)
+
+            places.extend(results['results'])
+            time.sleep(2)
+
+            while "next_page_token" in results:
+                params['pagetoken'] = results['next_page_token'],
+                res = requests.get(endpoint, params=params)
+                results = json.loads(res.content)
+                places.extend(results['results'])
+                time.sleep(2)
+
+            return_data = None
+
+            print(rating[0])
+
+            if(rating[0] == None):
+
+                places_length = len(places)
+                random_index = random.randint(
+                    0, math.ceil(np.log(places_length)))
+
+                print(places_length)
+
+                return_data = places[random_index]
+
+            else:
+
+                filtered_data = []
+
+                for i in places:
+
+                    if i['rating'] >= rating:
+                        filtered_data.append(i)
+
+                filtered_length = len(filtered_data)
+                random_index = random.randint(0, filtered_length-1)
+                return_data = filtered_data[0]
+
+            try:
+                image = ('https://maps.googleapis.com/maps/api/place/photo'
+                         '?maxwidth=%s'
+                         '&?maxheight=%s'
+                         '&photoreference=%s'
+                         '&key=%s') % (return_data['photos'][0]['width'], return_data['photos'][0]['height'],
+                                       return_data['photos'][0]['photo_reference'], data['google_key'])
+
+            except:
+                image = None
+
+            return_data['image_url'] = image
+
+            return_data = filter_place_details(
+                return_data['place_id'], return_data)
+
+            # print(return_data)
+
+            return(
+                jsonify(data=return_data, ok=True)
+            )
+
+        else:
+
+            return(jsonify(ok=False, response='Invalid access token'))
+
+
+def price_range_convert(arr):
+    intArr = []
+    returnObj = {
+        'minprice': '',
+        'maxprice': ''
     }
 
-    paths = response.download(arguments)
+    if(arr == None):
+        returnObj['maxprice'] = None
+        returnObj['minprice'] = None
 
-    print(paths)
+    else:
+
+        for i in arr:
+
+            intArr.append(len(i)-1)
+
+        intArr.sort()
+
+        if len(intArr) == 1:
+            returnObj['maxprice'] = intArr[0]
+            returnObj['minprice'] = None
+        else:
+            returnObj['maxprice'] = intArr[len(intArr)-1]
+            returnObj['minprice'] = intArr[0]
+
+    return returnObj
 
 
 @app.route('/')
