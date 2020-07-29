@@ -420,7 +420,7 @@ def places_filtered():
 
                 places_length = len(places)
                 random_index = random.randint(
-                    0, math.ceil(np.log(places_length)))
+                    0, Math.ceil(np.log(places_length)))
 
                 print(places_length)
 
