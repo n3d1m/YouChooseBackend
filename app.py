@@ -198,8 +198,6 @@ def places():
 
     else:
 
-        print('here')
-
         decode = decode_token(auth_header[1])
 
         # print(not isinstance(decode, str))
@@ -276,12 +274,16 @@ def filter_place_details(id, obj):
     detail_res = requests.get(place_detail_url, params=detail_params)
     place_details = json.loads(detail_res.content)
 
-    print(place_details['result']['reviews'])
+    # print(place_details['result']['reviews'])
     # print(place_details['result']['opening_hours']['weekday_text'])
     # print(place_details['result']['website'])
 
     # get_place_logo(place_details['result']['name'],
     # place_details['result']['formatted_address'].split(',')[1])
+
+    blacklist = ['facebook.com']
+    obj['address'] = place_details['result']['formatted_address'].split(',')[0]
+    obj['photo_array'] = get_photos(place_details['result']['photos'])
 
     try:
 
@@ -289,14 +291,29 @@ def filter_place_details(id, obj):
 
     except:
 
-        obj['opening_hours']['hours'] = None
+        try:
 
-    obj['address'] = place_details['result']['formatted_address'].split(',')[0]
-    obj['phone_number'] = place_details['result']['formatted_phone_number']
-    obj['photo_array'] = get_photos(place_details['result']['photos'])
-    obj['reviews'] = place_details['result']['reviews']
+            obj['opening_hours']['hours'] = None
 
-    blacklist = ['facebook.com']
+        except:
+
+            obj['opening_hours'] = None
+
+    try:
+
+        obj['phone_number'] = place_details['result']['formatted_phone_number']
+
+    except:
+
+        obj['phone_number'] = None
+
+    try:
+
+        obj['reviews'] = place_details['result']['reviews']
+
+    except:
+
+        obj['reviews'] = None
 
     try:
         website = place_details['result']['website'].split(
@@ -376,14 +393,18 @@ def places_filtered():
 
             print(request.get_json())
 
-            distance_val = 10000 if distance == None else distance*1000
+            distance_val = None if distance == None else str(distance*1000)
+            rating_val = None if rating[0] == None else str(
+                rating).strip('()').split(',')
+
+            print(rating)
 
             endpoint = "https://maps.googleapis.com/maps/api/place/details/json?parameters" if category == None else 'https://maps.googleapis.com/maps/api/place/textsearch/json?parameters'
             params = {
                 'key': data['google_key'],
                 'query': str(category) + ' food in ' + str(city),
                 'location': str(lat) + ',' + str(lng),
-                'radius': str(distance_val),
+                'radius': distance_val,
                 'minprice': price_range_convert(price_range)['minprice'],
                 'maxprice': price_range_convert(price_range)['maxprice'],
                 'type': 'restaurant|meal_delivery|meal_takeaway',
@@ -415,48 +436,56 @@ def places_filtered():
 
             return_data = None
 
-            print(rating[0])
+            #print('places: ', places)
 
-            if(rating[0] == None):
+            if(rating_val == None):
 
                 places_length = len(places)
                 random_index = random.randint(
-                    0, math.ceil(np.log(places_length)))
-
-                print(places_length)
-
+                    0, math.ceil(abs(np.log(places_length)/np.log(0.75))))
                 return_data = places[random_index]
 
             else:
 
                 filtered_data = []
+                rating_val.remove('')
+                rating_val = rating_val[0]
 
                 for i in places:
 
-                    if i['rating'] >= rating:
+                    if i['rating'] >= int(rating_val):
                         filtered_data.append(i)
 
                 filtered_length = len(filtered_data)
-                random_index = random.randint(0, filtered_length-1)
-                return_data = filtered_data[0]
+                print(filtered_length)
 
-            try:
-                image = ('https://maps.googleapis.com/maps/api/place/photo'
-                         '?maxwidth=%s'
-                         '&?maxheight=%s'
-                         '&photoreference=%s'
-                         '&key=%s') % (return_data['photos'][0]['width'], return_data['photos'][0]['height'],
-                                       return_data['photos'][0]['photo_reference'], data['google_key'])
+                if(filtered_length == 0):
 
-            except:
-                image = None
+                    return_data = None
 
-            return_data['image_url'] = image
+                else:
 
-            return_data = filter_place_details(
-                return_data['place_id'], return_data)
+                    random_index = random.randint(
+                        0, math.ceil(abs(np.log(filtered_length)/np.log(0.75))))
+                    return_data = filtered_data[random_index]
 
-            # print(return_data)
+            if(return_data != None):
+
+                try:
+                    image = ('https://maps.googleapis.com/maps/api/place/photo'
+                             '?maxwidth=%s'
+                             '&?maxheight=%s'
+                             '&photoreference=%s'
+                             '&key=%s') % (return_data['photos'][0]['width'], return_data['photos'][0]['height'],
+                                           return_data['photos'][0]['photo_reference'], data['google_key'])
+
+                except:
+                    image = None
+
+                return_data['image_url'] = image
+
+                return_data = filter_place_details(
+                    return_data['place_id'], return_data)
 
             return(
                 jsonify(data=return_data, ok=True)
@@ -468,7 +497,6 @@ def places_filtered():
 
 
 def price_range_convert(arr):
-    intArr = []
     returnObj = {
         'minprice': '',
         'maxprice': ''
@@ -480,6 +508,9 @@ def price_range_convert(arr):
 
     else:
 
+        arr = arr.split(', ')
+        intArr = []
+
         for i in arr:
 
             intArr.append(len(i)-1)
@@ -487,11 +518,11 @@ def price_range_convert(arr):
         intArr.sort()
 
         if len(intArr) == 1:
-            returnObj['maxprice'] = intArr[0]
+            returnObj['maxprice'] = intArr[0] if intArr[0] > 0 else intArr[0]+1
             returnObj['minprice'] = None
         else:
-            returnObj['maxprice'] = intArr[len(intArr)-1]
-            returnObj['minprice'] = intArr[0]
+            returnObj['maxprice'] = max(intArr)
+            returnObj['minprice'] = min(intArr)
 
     return returnObj
 
